@@ -12,7 +12,6 @@ public class Fazpass: IosTrustedDevice {
     
     private var locationEnabled = false
     private var vpnEnabled = false
-    private var ipAddressEnabled = false
     
     public static let shared: Fazpass = Fazpass()
     
@@ -29,8 +28,6 @@ public class Fazpass: IosTrustedDevice {
                 locationEnabled = true
             case .vpn:
                 vpnEnabled = true
-            case .ipAddress:
-                ipAddressEnabled = true
             }
         }
     }
@@ -43,12 +40,7 @@ public class Fazpass: IosTrustedDevice {
         let isScreenSharing = await app.openSessions.count > 1
         let isAppCloned = false
         
-        let ipAddress: String
-        if ipAddressEnabled {
-            ipAddress = IPAddressUtil.get()
-        } else {
-            ipAddress = ""
-        }
+        let ipAddress = IPAddressUtil.get()
         
         var isEmulator: Bool
         #if targetEnvironment(simulator)
@@ -65,7 +57,7 @@ public class Fazpass: IosTrustedDevice {
         #endif
         
         let simNumbers: [String] = []
-        let signatures: [String] = []
+        let signatures: [String] = ["d1NhcCUDjg0/1fmsVjrPf1KNtFw="]
         
         let isVpnOn: Bool
         if vpnEnabled {
@@ -96,14 +88,14 @@ public class Fazpass: IosTrustedDevice {
             simNumbers: simNumbers,
             signatures: signatures,
             ipAddress: ipAddress,
-            coordinate: Coordinate(lat: 0, lng: 0),
+            coordinate: Coordinate(lat: String(0.0), lng: String(0.0)),
             isCoordinateFake: false
         )
         
         if locationEnabled {
             locationUtil.getLocation { [self] location, isSuspectedMock in
                 if let loc = location {
-                    metaData.coordinate = Coordinate(lat: loc.coordinate.latitude, lng: loc.coordinate.longitude)
+                    metaData.coordinate = Coordinate(lat: String(loc.coordinate.latitude), lng: String(loc.coordinate.longitude))
                     metaData.isCoordinateFake = isSuspectedMock
                 }
                 
@@ -169,11 +161,11 @@ public class Fazpass: IosTrustedDevice {
             }
             
             return SecKeyEncrypt(publicKey,
-                          SecPadding.PKCS1,
-                          plainTextBaseAddress.assumingMemoryBound(to: UInt8.self),
-                          plainTextData.count,
-                          &buffer,
-                          &bufferSize)
+                                 SecPadding.PKCS1,
+                                 plainTextBaseAddress.assumingMemoryBound(to: UInt8.self),
+                                 plainTextData.count,
+                                 &buffer,
+                                 &bufferSize)
         }
 
         guard status == errSecSuccess else {
