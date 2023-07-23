@@ -1,7 +1,7 @@
 
 import Foundation
 
-class IPAddressUtil {
+internal class IPAddressUtil {
     
     static let url = URL(string: "https://api.ipify.org")
     

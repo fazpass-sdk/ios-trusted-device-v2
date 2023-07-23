@@ -1,5 +1,5 @@
 
-struct DeviceInfo: Codable {
+internal struct DeviceInfo: Codable {
     let os: String
     let brand: String
     let type: String

@@ -1,7 +1,7 @@
 
 import UIKit
 
-struct JailbreakUtil {
+internal struct JailbreakUtil {
     
     private let prohibitedDirList = [
         "/var/cache/apt",
