@@ -5,6 +5,6 @@
       location = "group:Dummy App/Dummy App.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:ios-trusted-device-v2">
+      location = "group:/">
    </FileRef>
 </Workspace>
