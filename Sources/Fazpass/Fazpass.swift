@@ -10,6 +10,7 @@ public class Fazpass: IosTrustedDevice {
     private let locationManager: CLLocationManager
     private let locationUtil: LocationUtil
     
+    private var assetName = ""
     private var locationEnabled = false
     private var vpnEnabled = false
     
@@ -19,6 +20,10 @@ public class Fazpass: IosTrustedDevice {
         locationManager = CLLocationManager()
         locationUtil = LocationUtil(locationManager)
         locationManager.delegate = locationUtil
+    }
+    
+    public func `init`(assetName: String) {
+        self.assetName = assetName
     }
     
     public func enableSelected(_ selected: SensitiveData...) {
@@ -32,7 +37,9 @@ public class Fazpass: IosTrustedDevice {
         }
     }
     
-    public func generateMeta(_ app: UIApplication, resultBlock: @escaping (String) -> Void) async {
+    public func generateMeta(resultBlock: @escaping (String) -> Void) async {
+        let app = await UIApplication.shared
+        
         let platform = "ios"
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
         let isJailbreak = JailbreakUtil(app).isJailbroken()
@@ -57,7 +64,7 @@ public class Fazpass: IosTrustedDevice {
         #endif
         
         let simNumbers: [String] = []
-        let signatures: [String] = ["d1NhcCUDjg0/1fmsVjrPf1KNtFw="]
+        let signatures: [String] = []
         
         let isVpnOn: Bool
         if vpnEnabled {
@@ -107,6 +114,11 @@ public class Fazpass: IosTrustedDevice {
     }
     
     private func encryptMetaData(_ metaData: MetaData) -> String {
+        guard let publicKeyFile = NSDataAsset(name: assetName) else {
+            print("Key not found!")
+            return ""
+        }
+        
         guard let jsonMetaData = metaData.toJsonString() else {
             print("Error encoding meta data to json")
             return ""
@@ -114,11 +126,6 @@ public class Fazpass: IosTrustedDevice {
         print(jsonMetaData.replacingOccurrences(of: ",", with: ",\n")
             .replacingOccurrences(of: "{", with: "{\n")
             .replacingOccurrences(of: "}", with: "\n}"))
-        
-        guard let publicKeyFile = NSDataAsset(name: "FazpassPublicKey") else {
-            print("Key not found!")
-            return ""
-        }
         
         guard var key = String(data: publicKeyFile.data, encoding: String.Encoding.utf8) else {
             print("Failed to convert public key file to string")
