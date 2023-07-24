@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
 spec.name       = "ios-trusted-device-v2"
-spec.version    = "0.0.1"
+spec.version    = "0.0.2"
 spec.summary    = "IOS Trusted Device"
 spec.description    = <<-DESC
 IOS counterpart for trusted device.
@@ -14,4 +14,5 @@ spec.swift_version = "5.7"
 spec.source	= { :git => "https://github.com/fazpass-sdk/ios-trusted-device-v2.git", :tag => "#{spec.version}" }
 spec.source_files = "Sources/Fazpass/**/*.swift"
 spec.xcconfig	= { "SWIFT_VERSION" => "#{spec.swift_version}" }
+spec.dependency = 'DeviceKit'
 end
