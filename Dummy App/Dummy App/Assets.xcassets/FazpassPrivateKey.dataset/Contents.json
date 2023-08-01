@@ -1,0 +1,13 @@
+{
+  "data" : [
+    {
+      "filename" : "my_private_key.key",
+      "idiom" : "universal",
+      "universal-type-identifier" : "com.apple.iwork.keynote.sffkey"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

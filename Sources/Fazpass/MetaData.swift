@@ -67,4 +67,34 @@ internal struct MetaData: Codable {
         
         return nil
     }
+    
+    func fromJsonString(_ json: String) -> MetaData? {
+        guard let data = json.data(using: .utf8, allowLossyConversion: false) else { return nil }
+        guard let mapper = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String:AnyObject] else { return nil }
+        
+        return MetaData(
+            platform: mapper[CodingKeys.platform.stringValue] as! String,
+            bundleIdentifier: mapper[CodingKeys.bundleIdentifier.stringValue] as! String,
+            isJailbroken: mapper[CodingKeys.isJailbroken.stringValue] as! Bool,
+            isVpn: mapper[CodingKeys.isVpn.stringValue] as! Bool,
+            isAppCloned: mapper[CodingKeys.isAppCloned.stringValue] as! Bool,
+            isScreenSharing: mapper[CodingKeys.isScreenSharing.stringValue] as! Bool,
+            isEmulator: mapper[CodingKeys.isEmulator.stringValue] as! Bool,
+            isDebug: mapper[CodingKeys.isDebug.stringValue] as! Bool,
+            deviceInfo: DeviceInfo(
+                os: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.os.stringValue] as! String,
+                brand: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.brand.stringValue] as! String,
+                type: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.type.stringValue] as! String,
+                cpu: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.cpu.stringValue] as! String
+            ),
+            simNumbers: [],
+            signatures: [],
+            ipAddress: mapper[CodingKeys.ipAddress.stringValue] as! String,
+            coordinate: Coordinate(
+                lat: mapper[CodingKeys.coordinate.stringValue]!["lat"] as! String,
+                lng: mapper[CodingKeys.coordinate.stringValue]!["lng"] as! String
+            ),
+            isCoordinateFake: mapper[CodingKeys.isCoordinateFake.stringValue] as! Bool
+        )
+    }
 }

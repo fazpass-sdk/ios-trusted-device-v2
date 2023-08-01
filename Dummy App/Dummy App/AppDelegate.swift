@@ -6,18 +6,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
-        Fazpass.shared.`init`(assetName: "FazpassPublicKey")
+        Fazpass.shared.`init`(publicAssetName: "FazpassPublicKey", privateAssetName: "FazpassPrivateKey")
         
-        Fazpass.shared.enableSelected(
-            SensitiveData.location,
-            SensitiveData.vpn
-        )
-        
-        Task {
-            await Fazpass.shared.generateMeta { meta in
-                print(meta)
-            }
-        }
+//        Fazpass.shared.enableSelected(
+//            SensitiveData.location,
+//            SensitiveData.vpn
+//        )
         
         return true
     }
