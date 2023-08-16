@@ -6,7 +6,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
-        Fazpass.shared.`init`(publicAssetName: "FazpassPublicKey", privateAssetName: "FazpassPrivateKey")
+        Fazpass.shared.`init`(publicAssetName: "FazpassPublicKey")
         
 //        Fazpass.shared.enableSelected(
 //            SensitiveData.location,

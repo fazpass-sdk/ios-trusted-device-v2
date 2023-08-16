@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>LSApplicationQueriesSchemes</key>
-	<array/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>We need your face id to prevent login fraud</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to prevent login fraud</string>
 </dict>

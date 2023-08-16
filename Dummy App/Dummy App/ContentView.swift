@@ -11,6 +11,7 @@ import Fazpass
 
 struct ContentView: View {
     
+    private let privateAssetName = "FazpassPrivateKey"
     private let bearerToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZGVudGlmaWVyIjo0fQ.WEV3bCizw9U_hxRC6DxHOzZthuJXRE8ziI3b6bHUpEI"
     
     @Environment(\.managedObjectContext) private var viewContext
@@ -47,7 +48,12 @@ struct ContentView: View {
     
     private func generateMeta() {
         deleteItems()
-        Fazpass.shared.generateMeta { meta in
+        Fazpass.shared.generateMeta { meta, error in
+            guard error == nil else {
+                print(error!)
+                return
+            }
+            
             addItem(
                 title: "Generated Meta",
                 content: meta,
@@ -95,7 +101,7 @@ struct ContentView: View {
                 
                 var fId = fazpassId
                 if (fId == nil || fId == "") {
-                    fId = Fazpass.shared.getFazpassId(response: strData)
+                    fId = getFazpassId(response: strData)
                     if (fId != "") {
                         self.addItem(title: "fazpass id", content: fId!, action: nil)
                     }
@@ -160,6 +166,74 @@ struct ContentView: View {
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }
         }
+    }
+    
+    private func getFazpassId(response: String) -> String {
+        guard let data = response.data(using: .utf8, allowLossyConversion: false) else { return "" }
+        guard let mapper = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String:AnyObject] else { return "" }
+        
+        guard let meta = mapper["data"]?["meta"] as? String else { return "" }
+        
+        let jsonMeta = decryptMetaData(meta)
+        if (!jsonMeta.isEmpty) {
+            guard let data2 = jsonMeta.data(using: .utf8, allowLossyConversion: false) else { return "" }
+            guard let mapper2 = try? JSONSerialization.jsonObject(with: data2, options: .mutableContainers) as? [String:AnyObject] else { return "" }
+            
+            return mapper2["fazpass_id"] as? String ?? ""
+        }
+        
+        return ""
+    }
+    
+    private func decryptMetaData(_ encryptedMetaData: String) -> String {
+        guard let data = Data(base64Encoded: encryptedMetaData) else {
+            print("Failed to encode encryted meta data!")
+            return ""
+        }
+        
+        guard let privateKeyFile = NSDataAsset(name: privateAssetName) else {
+            print("Key not found!")
+            return ""
+        }
+        
+        guard var key = String(data: privateKeyFile.data, encoding: String.Encoding.utf8) else {
+            print("Failed to convert private key file to string")
+            return ""
+        }
+        
+        key = key.replacingOccurrences(of: "-----BEGIN RSA PRIVATE KEY-----", with: "")
+            .replacingOccurrences(of: "-----END RSA PRIVATE KEY-----", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+        
+        guard let base64Key = Data(base64Encoded: key) else {
+            print("Failed to encode key to base64")
+            return ""
+        }
+        
+        let options: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrKeySizeInBits as String: 2048
+        ]
+
+        var error: Unmanaged<CFError>?
+        guard let privateKey = SecKeyCreateWithData(base64Key as CFData,
+                                                options as CFDictionary,
+                                                &error) else {
+            print(String(describing: error))
+            return ""
+        }
+        
+        var keySize = SecKeyGetBlockSize(privateKey)
+        var keyBuffer = [UInt8](repeating: 0, count: keySize)
+        
+        // Decrypted data will be written to keyBuffer
+        guard SecKeyDecrypt(privateKey, .PKCS1, [UInt8](data), data.count, &keyBuffer, &keySize) == errSecSuccess else {
+            return ""
+        }
+            
+        return String(bytes: keyBuffer, encoding: .utf8)?.replacingOccurrences(of: "\u{0000}", with: "", options: NSString.CompareOptions.literal, range: nil).trimmingCharacters(in: .whitespaces) ?? ""
     }
 }
 

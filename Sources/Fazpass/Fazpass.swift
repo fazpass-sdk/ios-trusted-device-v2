@@ -4,6 +4,7 @@
 import UIKit
 import CoreLocation
 import NetworkExtension
+import LocalAuthentication
 
 public class Fazpass: IosTrustedDevice {
     
@@ -11,7 +12,6 @@ public class Fazpass: IosTrustedDevice {
     private let locationUtil: LocationUtil
     
     private var publicAssetName = ""
-    private var privateAssetName = ""
     private var locationEnabled = false
     private var vpnEnabled = false
     
@@ -23,9 +23,8 @@ public class Fazpass: IosTrustedDevice {
         locationManager.delegate = locationUtil
     }
     
-    public func `init`(publicAssetName: String, privateAssetName: String) {
+    public func `init`(publicAssetName: String) {
         self.publicAssetName = publicAssetName
-        self.privateAssetName = privateAssetName
     }
     
     public func enableSelected(_ selected: SensitiveData...) {
@@ -39,102 +38,125 @@ public class Fazpass: IosTrustedDevice {
         }
     }
     
-    public func generateMeta(resultBlock: @escaping (String) -> Void) {
-        let app = UIApplication.shared
-        
-        Task {
-            let platform = "ios"
-            let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
-            let isJailbreak = JailbreakUtil(app).isJailbroken()
-            let deviceInfo = DeviceInfoUtil().deviceInfo
-            let isScreenSharing = await app.openSessions.count > 1
-            let isAppCloned = false
+    public func generateMeta(resultBlock: @escaping (String, Error?) -> Void) {
+        openBiometric { error in
+            guard error == nil else {
+                resultBlock("", error)
+                return
+            }
             
-            let ipAddress = IPAddressUtil.get()
+            let app = UIApplication.shared
             
-            var isEmulator: Bool
-            #if targetEnvironment(simulator)
-            isEmulator = true
-            #else
-            isEmulator = false
-            #endif
-            
-            var isDebug: Bool
-            #if DEBUG
-            isDebug = true
-            #else
-            isDebug = false
-            #endif
-            
-            let simNumbers: [String] = []
-            let signatures: [String] = []
-            
-            let isVpnOn: Bool
-            if vpnEnabled {
-                isVpnOn = await withCheckedContinuation { continuation in
-                    let vpnManager = NEVPNManager.shared()
-                    vpnManager.loadFromPreferences { error in
-                        guard error == nil else {
-                            continuation.resume(returning: false)
-                            return
+            Task {
+                let platform = "ios"
+                let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
+                let isJailbreak = JailbreakUtil(app).isJailbroken()
+                let deviceInfo = DeviceInfoUtil().deviceInfo
+                let isScreenSharing = await app.openSessions.count > 1
+                let isAppCloned = false
+                
+                let ipAddress = IPAddressUtil.get()
+                
+                var isEmulator: Bool
+                #if targetEnvironment(simulator)
+                isEmulator = true
+                #else
+                isEmulator = false
+                #endif
+                
+                var isDebug: Bool
+                #if DEBUG
+                isDebug = true
+                #else
+                isDebug = false
+                #endif
+                
+                let simNumbers: [String] = []
+                let signatures: [String] = []
+                
+                let isVpnOn: Bool
+                if self.vpnEnabled {
+                    isVpnOn = await withCheckedContinuation { continuation in
+                        let vpnManager = NEVPNManager.shared()
+                        vpnManager.loadFromPreferences { error in
+                            guard error == nil else {
+                                continuation.resume(returning: false)
+                                return
+                            }
+                            continuation.resume(returning: vpnManager.connection.status == .connected)
                         }
-                        continuation.resume(returning: vpnManager.connection.status == .connected)
                     }
+                } else {
+                    isVpnOn = false
                 }
-            } else {
-                isVpnOn = false
-            }
-            
-            var metaData = MetaData(
-                platform: platform,
-                bundleIdentifier: bundleIdentifier,
-                isJailbroken: isJailbreak,
-                isVpn: isVpnOn,
-                isAppCloned: isAppCloned,
-                isScreenSharing: isScreenSharing,
-                isEmulator: isEmulator,
-                isDebug: isDebug,
-                deviceInfo: deviceInfo,
-                simNumbers: simNumbers,
-                signatures: signatures,
-                ipAddress: ipAddress,
-                coordinate: Coordinate(lat: String(0.0), lng: String(0.0)),
-                isCoordinateFake: false
-            )
-            
-            if locationEnabled {
-                locationUtil.getLocation { [self] location, isSuspectedMock in
-                    if let loc = location {
-                        metaData.coordinate = Coordinate(lat: String(loc.coordinate.latitude), lng: String(loc.coordinate.longitude))
-                        metaData.isCoordinateFake = isSuspectedMock
+                
+                var metaData = MetaData(
+                    platform: platform,
+                    bundleIdentifier: bundleIdentifier,
+                    isJailbroken: isJailbreak,
+                    isVpn: isVpnOn,
+                    isAppCloned: isAppCloned,
+                    isScreenSharing: isScreenSharing,
+                    isEmulator: isEmulator,
+                    isDebug: isDebug,
+                    deviceInfo: deviceInfo,
+                    simNumbers: simNumbers,
+                    signatures: signatures,
+                    ipAddress: ipAddress,
+                    coordinate: Coordinate(lat: String(0.0), lng: String(0.0)),
+                    isCoordinateFake: false
+                )
+                
+                if self.locationEnabled {
+                    self.locationUtil.getLocation { location, isSuspectedMock in
+                        if let loc = location {
+                            metaData.coordinate = Coordinate(lat: String(loc.coordinate.latitude), lng: String(loc.coordinate.longitude))
+                            metaData.isCoordinateFake = isSuspectedMock
+                        }
+                        
+                        var encryptedMeta = ""
+                        var e: Error?
+                        do {
+                            encryptedMeta = try self.encryptMetaData(metaData)
+                        } catch {
+                            e = error
+                        }
+                        resultBlock(encryptedMeta, e)
                     }
-                    
-                    resultBlock(self.encryptMetaData(metaData))
+                } else {
+                    var encryptedMeta = ""
+                    var e: Error?
+                    do {
+                        encryptedMeta = try self.encryptMetaData(metaData)
+                    } catch {
+                        e = error
+                    }
+                    resultBlock(encryptedMeta, e)
                 }
-            } else {
-                resultBlock(encryptMetaData(metaData))
             }
         }
     }
     
-    public func getFazpassId(response: String) -> String {
-        guard let data = response.data(using: .utf8, allowLossyConversion: false) else { return "" }
-        guard let mapper = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String:AnyObject] else { return "" }
-        
-        guard let meta = mapper["data"]?["meta"] as? String else { return "" }
-        
-        let jsonMeta = decryptMetaData(meta)
-        if (!jsonMeta.isEmpty) {
-            guard let data2 = jsonMeta.data(using: .utf8, allowLossyConversion: false) else { return "" }
-            guard let mapper2 = try? JSONSerialization.jsonObject(with: data2, options: .mutableContainers) as? [String:AnyObject] else { return "" }
-            
-            return mapper2["fazpass_id"] as? String ?? ""
+    private func openBiometric(_ resultBlock: @escaping (Error?) -> Void) {
+        let context = LAContext()
+        context.localizedReason = "Biometric Required"
+        context.localizedCancelTitle = "Cancel Action"
+        var nsError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
+            resultBlock(nsError)
+            return
         }
-        
-        return ""
+        Task {
+            do {
+                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Log in to your account")
+                resultBlock(nil)
+            } catch let error {
+                resultBlock(error)
+            }
+        }
     }
     
-    private func encryptMetaData(_ metaData: MetaData) -> String {
+    private func encryptMetaData(_ metaData: MetaData) throws -> String {
         guard let publicKeyFile = NSDataAsset(name: publicAssetName) else {
             print("Key not found!")
             return ""
@@ -200,57 +222,6 @@ public class Fazpass: IosTrustedDevice {
 
         // encode to base64 string then return
         return Data(bytes: buffer, count: bufferSize).base64EncodedString()
-    }
-    
-    private func decryptMetaData(_ encryptedMetaData: String) -> String {
-        guard let data = Data(base64Encoded: encryptedMetaData) else {
-            print("Failed to encode encryted meta data!")
-            return ""
-        }
-        
-        guard let privateKeyFile = NSDataAsset(name: privateAssetName) else {
-            print("Key not found!")
-            return ""
-        }
-        
-        guard var key = String(data: privateKeyFile.data, encoding: String.Encoding.utf8) else {
-            print("Failed to convert private key file to string")
-            return ""
-        }
-        
-        key = key.replacingOccurrences(of: "-----BEGIN RSA PRIVATE KEY-----", with: "")
-            .replacingOccurrences(of: "-----END RSA PRIVATE KEY-----", with: "")
-            .replacingOccurrences(of: "\n", with: "")
-            .replacingOccurrences(of: "\r", with: "")
-        
-        guard let base64Key = Data(base64Encoded: key) else {
-            print("Failed to encode key to base64")
-            return ""
-        }
-        
-        let options: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
-            kSecAttrKeySizeInBits as String: 2048
-        ]
-
-        var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateWithData(base64Key as CFData,
-                                                options as CFDictionary,
-                                                &error) else {
-            print(String(describing: error))
-            return ""
-        }
-        
-        var keySize = SecKeyGetBlockSize(privateKey)
-        var keyBuffer = [UInt8](repeating: 0, count: keySize)
-        
-        // Decrypted data will be written to keyBuffer
-        guard SecKeyDecrypt(privateKey, .PKCS1, [UInt8](data), data.count, &keyBuffer, &keySize) == errSecSuccess else {
-            return ""
-        }
-            
-        return String(bytes: keyBuffer, encoding: .utf8)?.replacingOccurrences(of: "\u{0000}", with: "", options: NSString.CompareOptions.literal, range: nil).trimmingCharacters(in: .whitespaces) ?? ""
     }
 }
 #else
