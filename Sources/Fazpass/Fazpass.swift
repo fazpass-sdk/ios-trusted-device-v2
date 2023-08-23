@@ -139,21 +139,49 @@ public class Fazpass: IosTrustedDevice {
     
     private func openBiometric(_ resultBlock: @escaping (Error?) -> Void) {
         let context = LAContext()
-        context.localizedReason = "Biometric Required"
-        context.localizedCancelTitle = "Cancel Action"
-        var nsError: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
-            resultBlock(nsError)
-            return
-        }
-        Task {
-            do {
-                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Log in to your account")
-                resultBlock(nil)
-            } catch let error {
-                resultBlock(error)
+        context.localizedCancelTitle = "Cancel"
+        var error: NSError?
+        
+        // Check if the device supports biometric authentication
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            let reason = "Biometric Required"
+
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                DispatchQueue.main.async {
+                    if success {
+                        // Successful authentication
+                        resultBlock(nil)
+                    } else {
+                        // Error handling
+                        guard let authError = authenticationError else {
+                            return
+                        }
+                        
+                        switch authError {
+                        case LAError.userFallback:
+                            resultBlock(authError)
+                        default:
+                            return
+                        }
+                    }
+                }
             }
+        } else {
+            // Device does not support biometric authentication
+            resultBlock(error)
         }
+//        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
+//            resultBlock(nsError)
+//            return
+//        }
+//        Task {
+//            do {
+//                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Log in to your account")
+//                resultBlock(nil)
+//            } catch let error {
+//                resultBlock(error)
+//            }
+//        }
     }
     
     private func encryptMetaData(_ metaData: MetaData) throws -> String {
