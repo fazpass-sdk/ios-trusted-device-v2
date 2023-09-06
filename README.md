@@ -80,11 +80,11 @@ Fazpass.shared.generateMeta { meta, fazpassError in
 ## Errors
 
 * biometricNoneEnrolled<br>
-Produced when device can't start biometric authentication because there is no biometry or device passcode enrolled.
+Produced when device can't start biometric authentication because there is no biometry (Touch ID or Face ID) or device passcode enrolled.
 * biometricAuthFailed<br>
 Produced when biometric authentication is finished with an error (e.g. User cancelled biometric auth, etc).
 * biometricNotAvailable<br>
-Produced when device can't start biometric authentication because biometry (Touch ID or Face ID) is unavailable.
+Produced when device can't start biometric authentication because biometry is unavailable.
 * biometricNotInteractive<br>
 Produced when device can't start biometric authentication because displaying the required authentication user interface is forbidden. To fix this, you have to permit the display of the authentication UI by setting the interactionNotAllowed property to false.
 * encryptionError<br>
