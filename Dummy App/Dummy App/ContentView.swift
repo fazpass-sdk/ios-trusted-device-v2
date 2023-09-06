@@ -40,9 +40,8 @@ struct ContentView: View {
                     }
                 }
             }
-            HStack {
-                Button("Generate Meta", action: generateMeta)
-            }
+            Button("Generate Meta", action: generateMeta)
+                .padding(EdgeInsets(top: 0.0, leading: 0.0, bottom: 12.0, trailing: 0.0))
         }
     }
     

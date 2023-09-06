@@ -11,7 +11,7 @@ internal class IPAddressUtil {
                 let ipAddress = try String(contentsOf: url)
                 return ipAddress
             }
-        } catch let error {
+        } catch {
             print(error)
         }
         

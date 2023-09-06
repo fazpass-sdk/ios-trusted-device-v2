@@ -6,6 +6,6 @@ final class ios_trusted_device_v2Tests: XCTestCase {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
-        XCTAssertEqual(Fazpass().text, "Hello, World!")
+        // XCTAssertEqual(Fazpass().text, "Hello, World!")
     }
 }

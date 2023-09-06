@@ -38,7 +38,7 @@ public class Fazpass: IosTrustedDevice {
         }
     }
     
-    public func generateMeta(resultBlock: @escaping (String, Error?) -> Void) {
+    public func generateMeta(resultBlock: @escaping (String, FazpassError?) -> Void) {
         openBiometric { error in
             guard error == nil else {
                 resultBlock("", error)
@@ -115,21 +115,25 @@ public class Fazpass: IosTrustedDevice {
                         }
                         
                         var encryptedMeta = ""
-                        var e: Error?
+                        var e: FazpassError?
                         do {
                             encryptedMeta = try self.encryptMetaData(metaData)
-                        } catch {
+                        } catch is FazpassError {
                             e = error
+                        } catch {
+                            e = FazpassError.unknownError(error)
                         }
                         resultBlock(encryptedMeta, e)
                     }
                 } else {
                     var encryptedMeta = ""
-                    var e: Error?
+                    var e: FazpassError?
                     do {
                         encryptedMeta = try self.encryptMetaData(metaData)
-                    } catch {
+                    } catch is FazpassError {
                         e = error
+                    } catch {
+                        e = FazpassError.unknownError(error)
                     }
                     resultBlock(encryptedMeta, e)
                 }
@@ -137,16 +141,16 @@ public class Fazpass: IosTrustedDevice {
         }
     }
     
-    private func openBiometric(_ resultBlock: @escaping (Error?) -> Void) {
+    private func openBiometric(_ resultBlock: @escaping (FazpassError?) -> Void) {
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
         var error: NSError?
         
         // Check if the device supports biometric authentication
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
             let reason = "Biometric Required"
 
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, authenticationError in
                 DispatchQueue.main.async {
                     if success {
                         // Successful authentication
@@ -158,46 +162,41 @@ public class Fazpass: IosTrustedDevice {
                         }
                         
                         switch authError {
-                        case LAError.userFallback:
-                            resultBlock(authError)
-                        default:
+                        case LAError.userCancel, LAError.appCancel, LAError.systemCancel://, LAError.biometryLockout:
+                            resultBlock(FazpassError.biometricAuthFailed)
+                        case LAError.userFallback, LAError.authenticationFailed:
                             return
+                        default:
+                            resultBlock(FazpassError.unknownError(authError))
                         }
                     }
                 }
             }
         } else {
-            // Device does not support biometric authentication
-            resultBlock(error)
+            switch LAError.Code(rawValue: error!.code)! {
+            case .passcodeNotSet, .biometryNotEnrolled:
+                resultBlock(FazpassError.biometricNoneEnrolled)
+            case .biometryNotAvailable:
+                resultBlock(FazpassError.biometricNotAvailable)
+            case .notInteractive:
+                resultBlock(FazpassError.biometricNotInteractive)
+            default:
+                resultBlock(FazpassError.unknownError(error!))
+            }
         }
-//        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
-//            resultBlock(nsError)
-//            return
-//        }
-//        Task {
-//            do {
-//                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Log in to your account")
-//                resultBlock(nil)
-//            } catch let error {
-//                resultBlock(error)
-//            }
-//        }
     }
     
     private func encryptMetaData(_ metaData: MetaData) throws -> String {
         guard let publicKeyFile = NSDataAsset(name: publicAssetName) else {
-            print("Key not found!")
-            return ""
+            throw FazpassError.publicKeyNotExist
         }
         
         guard let jsonMetaData = metaData.toJsonString() else {
-            print("Error encoding meta data to json")
-            return ""
+            throw FazpassError.encryptionError("Error encoding meta data to json")
         }
         
         guard var key = String(data: publicKeyFile.data, encoding: String.Encoding.utf8) else {
-            print("Failed to convert public key file to string")
-            return ""
+            throw FazpassError.encryptionError("Failed to convert public key file to string")
         }
         
         key = key.replacingOccurrences(of: "-----BEGIN RSA PUBLIC KEY-----", with: "")
@@ -206,8 +205,7 @@ public class Fazpass: IosTrustedDevice {
             .replacingOccurrences(of: "\r", with: "")
         
         guard let base64Key = Data(base64Encoded: key) else {
-            print("Failed to encode key to base64")
-            return ""
+            throw FazpassError.encryptionError("Failed to encode key to base64")
         }
         
         let options: [String: Any] = [
@@ -221,8 +219,7 @@ public class Fazpass: IosTrustedDevice {
         guard let publicKey = SecKeyCreateWithData(base64Key as CFData,
                                                 options as CFDictionary,
                                                 &error) else {
-            print(String(describing: error))
-            return ""
+            throw FazpassError.encryptionError(String(describing: error))
         }
         
         // Encrypt json metadata with public key
@@ -244,8 +241,7 @@ public class Fazpass: IosTrustedDevice {
         }
 
         guard status == errSecSuccess else {
-            print("Encryption failed")
-            return ""
+            throw FazpassError.encryptionError("Encryption failed with \(status.description)")
         }
 
         // encode to base64 string then return
