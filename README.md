@@ -38,6 +38,9 @@ after you have each of them, reference the public key into Assets.
 3. Reference your public key into this asset.
 4. Name your asset.
 
+Then, you have to declare NSFaceIDUsageDescription in your Info.plist file to be able to generate meta, because 
+generating meta requires user to do biometry authentication.
+
 This package main purpose is to generate meta which you can use to communicate with Fazpass rest API. But
 before calling generate meta method, you have to initialize it first by calling this method:
 ```swift
