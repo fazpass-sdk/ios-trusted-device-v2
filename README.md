@@ -51,8 +51,8 @@ collects specific information and generates meta data as Base64 string.
 You can use this meta to hit Fazpass API endpoint. **Will launch biometric authentication before
 generating meta**. Meta will be empty string if error is present.
 ```swift
-Fazpass.shared.generateMeta { meta, error in 
-    guard let error = error else {
+Fazpass.shared.generateMeta { meta, fazpassError in 
+    guard let error = fazpassError else {
         print(meta)
     }
     
@@ -101,7 +101,7 @@ Produced when an unknown error has been occured when trying to generate meta. Gi
 Data collected and stored in generated meta. Based on data sensitivity, data type is divided into two: General data and Sensitive data.
 General data is always collected while Sensitive data requires more complicated procedures to enable it.
 
-To enable Sensitive data collection, after calling fazpass init method, you need to call `enableSelected(sensitiveData: SensitiveData)` method and
+To enable Sensitive data collection, after calling fazpass init method, you need to call `enableSelected(sensitiveData: SensitiveData...)` method and
 specifies which sensitive data you want to collect.
 ```swift
 Fazpass.shared.enableSelected(
