@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
 spec.name       = "ios-trusted-device-v2"
-spec.version    = "0.0.7"
+spec.version    = "1.0.0"
 spec.summary    = "IOS Trusted Device"
 spec.description    = <<-DESC
 IOS counterpart for trusted device.
