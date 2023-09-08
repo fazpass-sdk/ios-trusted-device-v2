@@ -82,21 +82,36 @@ Fazpass.shared.generateMeta { meta, fazpassError in
 
 ## Errors
 
-* biometricNoneEnrolled<br>
-Produced when device can't start biometric authentication because there is no biometry (Touch ID or Face ID) or device passcode enrolled.
-* biometricAuthFailed<br>
-Produced when biometric authentication is finished with an error (e.g. User cancelled biometric auth, etc).
-* biometricNotAvailable<br>
-Produced when device can't start biometric authentication because biometry is unavailable.
-* biometricNotInteractive<br>
-Produced when device can't start biometric authentication because displaying the required authentication user interface is forbidden. To fix this, you have to permit the display of the authentication UI by setting the interactionNotAllowed property to false.
-* encryptionError<br>
+#### biometricNoneEnrolled
+
+Produced when device can't start biometry authentication because there is no biometry (Touch ID or Face ID) or device passcode enrolled.
+
+#### biometricAuthFailed
+
+Produced when biometry authentication is finished with an error (e.g. User cancelled biometric auth, etc).
+
+#### biometricNotAvailable
+
+Produced when device can't start biometry authentication because biometry is unavailable.
+
+#### biometricNotInteractive
+
+Produced when device can't start biometry authentication because displaying the required authentication user interface is forbidden. To fix this, you have to permit the display of the authentication UI by setting the interactionNotAllowed property to false.
+
+#### encryptionError
+
 Produced when encryption went wrong because you used the wrong public key. Gives you string message of what went wrong.
-* publicKeyNotExist<br>
+
+#### publicKeyNotExist
+
 Produced when public key with the name registered in init method doesn't exist as an asset.
-* uninitialized<br>
+
+#### uninitialized
+
 Produced when fazpass init method hasn't been called once.
-* unknownError<br>
+
+#### unknownError
+
 Produced when an unknown error has been occured when trying to generate meta. Gives you an error object of what went wrong. Less likely to happen if you followed the procedure correctly.
 
 ## Data Collection
@@ -112,7 +127,7 @@ Fazpass.shared.enableSelected(
     SensitiveData.vpn
 )
 ```
-After enabling specified Sensitive data, you have to follow the procedure for each of them as described in their own segment down below.
+Lastly, you have to follow the procedure to enable each of them as described in their own segment down below.
 
 ### General data collected
 
@@ -127,7 +142,7 @@ After enabling specified Sensitive data, you have to follow the procedure for ea
 
 ### Sensitive data collected
 
-#### Your device location (X and Y coordinate, mock location status)
+#### Your device location and mock location status
 
 To collect location data, declare NSLocationWhenInUseUsageDescription in your Info.plist file.
 When it's enabled, user will be automatically asked to permit the LocationWhenInUse permission when fazpass generate meta method is called.
