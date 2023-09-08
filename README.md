@@ -12,13 +12,13 @@ iOS 13.0
 
 You can add this package into your project by either swift package or podspec.
 
-### Using swift package
+### Using Swift Package
 
 1. Open Xcode, click File > Add Packages...
 2. Enter this package URL: https://github.com/fazpass-sdk/ios-trusted-device-v2.git
 3. Click Add Package
 
-### Using podspec
+### Using Cocoapods
 
 In your podspec file, add the dependency:
 ```podspec
