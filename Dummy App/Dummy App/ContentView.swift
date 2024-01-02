@@ -11,8 +11,9 @@ import Fazpass
 
 struct ContentView: View {
     
-    private let privateAssetName = "FazpassPrivateKey"
-    private let bearerToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZGVudGlmaWVyIjo0fQ.WEV3bCizw9U_hxRC6DxHOzZthuJXRE8ziI3b6bHUpEI"
+    private let privateAssetName = "FazpassStagingPrivateKey"
+    private let bearerToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZGVudGlmaWVyIjozNn0.mfny8amysdJQYlCrUlYeA-u4EG1Dw9_nwotOl-0XuQ8"
+    private let merchantAppId = "afb2c34a-4c4f-4188-9921-5c17d81a3b3d"
     
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -35,7 +36,7 @@ struct ContentView: View {
                         if (item.action != nil) {
                             let a = ActionData.fromJsonString(item.action!)!
                             let type = RequestType(rawValue: a.type)!
-                            Button(type.rawValue) { apiRequest(type: type, meta: a.meta, fazpassId: a.fazpassId) }
+                            Button(type.rawValue) { apiRequest(type: type, meta: a.meta, fazpassId: a.fazpassId, challenge: a.challenge) }
                         }
                     }
                 }
@@ -48,24 +49,25 @@ struct ContentView: View {
     private func generateMeta() {
         deleteItems()
         Fazpass.shared.generateMeta { meta, error in
-            guard error == nil else {
-                print(error!)
+            guard let error = error else {
+                addItem(
+                    title: "Generated Meta",
+                    content: meta,
+                    action: ActionData(
+                        type: RequestType.check.rawValue,
+                        meta: meta,
+                        fazpassId: nil,
+                        challenge: nil
+                    ).toJsonString()
+                )
                 return
             }
             
-            addItem(
-                title: "Generated Meta",
-                content: meta,
-                action: ActionData(
-                    type: RequestType.check.rawValue,
-                    meta: meta,
-                    fazpassId: nil
-                ).toJsonString()
-            )
+            print(error)
         }
     }
     
-    private func apiRequest(type: RequestType, meta: String, fazpassId: String? = nil) {
+    private func apiRequest(type: RequestType, meta: String, fazpassId: String? = nil, challenge: String? = nil) {
         let url = URL(string: "https://api.fazpas.com/v2/trusted-device/\(type)")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -74,20 +76,30 @@ struct ContentView: View {
             "Content-Type": "application/json"
         ]
         switch type {
-        case .check, .enroll:
+        case .check:
             request.httpBody = """
             {
-              "merchant_app_id": "e30e8ae2-1557-46f6-ba3a-755b57ce4c44",
+              "merchant_app_id": "\(merchantAppId)",
               "meta": "\(meta)",
               "pic_id": "anvarisy@gmail.com"
+            }
+            """.data(using: .utf8)
+        case .enroll:
+            request.httpBody = """
+            {
+              "merchant_app_id": "\(merchantAppId)",
+              "meta": "\(meta)",
+              "pic_id": "anvarisy@gmail.com",
+              "challenge": "\(challenge ?? "")"
             }
             """.data(using: .utf8)
         case .validate, .remove:
             request.httpBody = """
             {
-              "merchant_app_id": "e30e8ae2-1557-46f6-ba3a-755b57ce4c44",
+              "merchant_app_id": "\(merchantAppId)",
               "meta": "\(meta)",
-              "fazpass_id": "\(fazpassId ?? "")"
+              "fazpass_id": "\(fazpassId ?? "")",
+              "challenge": "\(challenge ?? "")"
             }
             """.data(using: .utf8)
         }
@@ -98,22 +110,36 @@ struct ContentView: View {
                     return
                 }
                 
+                self.addItem(title: "\(type) Response", content: strData, action: nil)
+                
                 var fId = fazpassId
-                if (fId == nil || fId == "") {
-                    fId = getFazpassId(response: strData)
-                    if (fId != "") {
-                        self.addItem(title: "fazpass id", content: fId!, action: nil)
+                var chal = challenge
+                if type == .check {
+                    print(strData)
+                    let fIdAndChal = getFazpassIdAndChallenge(response: strData)
+                    print(fIdAndChal)
+                    if ((fId == nil || fId == "") && fIdAndChal.isEmpty == false) {
+                        fId = fIdAndChal[0]
+                        if (fId != "") {
+                            self.addItem(title: "fazpass id", content: fId!, action: nil)
+                        }
+                    }
+                    if ((chal == nil || chal == "") && fIdAndChal.isEmpty == false) {
+                        chal = fIdAndChal[1]
+                        if (chal != "") {
+                            self.addItem(title: "challenge", content: chal!, action: nil)
+                        }
                     }
                 }
                 
                 var action: ActionData?
                 switch type {
                 case .check:
-                    action = ActionData(type: RequestType.enroll.rawValue, meta: meta, fazpassId: fId)
+                    action = ActionData(type: RequestType.enroll.rawValue, meta: meta, fazpassId: fId, challenge: chal)
                 case .enroll:
-                    action = ActionData(type: RequestType.validate.rawValue, meta: meta, fazpassId: fId)
+                    action = ActionData(type: RequestType.validate.rawValue, meta: meta, fazpassId: fId, challenge: chal)
                 case .validate:
-                    action = ActionData(type: RequestType.remove.rawValue, meta: meta, fazpassId: fId)
+                    action = ActionData(type: RequestType.remove.rawValue, meta: meta, fazpassId: fId, challenge: chal)
                 default:
                     action = nil
                 }
@@ -144,8 +170,6 @@ struct ContentView: View {
             do {
                 try viewContext.save()
             } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
                 let nsError = error as NSError
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }
@@ -157,7 +181,8 @@ struct ContentView: View {
             items.forEach(viewContext.delete)
 
             do {
-                try viewContext.save()
+                try PersistenceController.shared.container.viewContext.save()
+                viewContext.refreshAllObjects()
             } catch {
                 // Replace this implementation with code to handle the error appropriately.
                 // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
@@ -167,21 +192,25 @@ struct ContentView: View {
         }
     }
     
-    private func getFazpassId(response: String) -> String {
-        guard let data = response.data(using: .utf8, allowLossyConversion: false) else { return "" }
-        guard let mapper = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String:AnyObject] else { return "" }
+    private func getFazpassIdAndChallenge(response: String) -> [String] {
+        guard let data = response.data(using: .utf8, allowLossyConversion: false) else { return [] }
+        guard let mapper = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String:AnyObject] else { return [] }
         
-        guard let meta = mapper["data"]?["meta"] as? String else { return "" }
+        guard let meta = mapper["data"]?["meta"] as? String else { return [] }
         
         let jsonMeta = decryptMetaData(meta)
+        print(jsonMeta)
         if (!jsonMeta.isEmpty) {
-            guard let data2 = jsonMeta.data(using: .utf8, allowLossyConversion: false) else { return "" }
-            guard let mapper2 = try? JSONSerialization.jsonObject(with: data2, options: .mutableContainers) as? [String:AnyObject] else { return "" }
-            
-            return mapper2["fazpass_id"] as? String ?? ""
+            guard let data2 = jsonMeta.data(using: .utf8, allowLossyConversion: false) else { return [] }
+            guard let mapper2 = try? JSONSerialization.jsonObject(with: data2, options: .mutableContainers) as? [String:AnyObject] else { return [] }
+
+            print("biometric: \(mapper2["biometric"] as? [String:Any] ?? [:])")
+
+            return [ mapper2["fazpass_id"] as? String ?? "",
+                     mapper2["challenge"] as? String ?? "" ]
         }
         
-        return ""
+        return []
     }
     
     private func decryptMetaData(_ encryptedMetaData: String) -> String {

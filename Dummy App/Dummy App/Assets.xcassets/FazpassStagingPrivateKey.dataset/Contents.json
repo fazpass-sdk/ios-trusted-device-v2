@@ -1,9 +1,9 @@
 {
   "data" : [
     {
-      "filename" : "my_public_key.pub",
+      "filename" : "staging-private_key.key",
       "idiom" : "universal",
-      "universal-type-identifier" : "dyn.ah62d4rv4ge81a7pc"
+      "universal-type-identifier" : "com.apple.iwork.keynote.sffkey"
     }
   ],
   "info" : {

@@ -11,6 +11,7 @@ struct ActionData: Codable {
     let type: String
     let meta: String
     let fazpassId: String?
+    let challenge: String?
     
     func toJsonString() -> String? {
         if let jsonData = try? JSONEncoder().encode(self) {

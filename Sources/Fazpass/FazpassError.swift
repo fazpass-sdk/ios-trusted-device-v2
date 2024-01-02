@@ -4,10 +4,9 @@ import Foundation
 public enum FazpassError : Error {
     case biometricNoneEnrolled
     case biometricAuthFailed
-    case biometricNotAvailable
+    case biometricNotAvailable(message: String)
     case biometricNotInteractive
-    case encryptionError(String)
+    case encryptionError(message: String)
     case publicKeyNotExist
     case uninitialized
-    case unknownError(Error)
 }

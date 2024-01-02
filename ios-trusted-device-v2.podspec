@@ -15,4 +15,6 @@ spec.source	= { :git => "https://github.com/fazpass-sdk/ios-trusted-device-v2.gi
 spec.source_files = "Sources/Fazpass/**/*.swift"
 spec.xcconfig	= { "SWIFT_VERSION" => "#{spec.swift_version}" }
 spec.dependency 'DeviceKit'
+spec.dependency 'FirebaseAnalyticsSwift'
+spec.dependency 'FirebaseMessaging'
 end

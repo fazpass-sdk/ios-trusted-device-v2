@@ -3,53 +3,62 @@ import Foundation
 
 internal struct MetaData: Codable {
     let platform: String
-    let bundleIdentifier: String
     let isJailbroken: Bool
+    let isEmulator: Bool
+    var isCoordinateFake: Bool
+    let signatures: [String]
     let isVpn: Bool
     let isAppCloned: Bool
     let isScreenSharing: Bool
-    let isEmulator: Bool
     let isDebug: Bool
+    let bundleIdentifier: String
     let deviceInfo: DeviceInfo
     let simNumbers: [String]
-    let signatures: [String]
-    let ipAddress: String
+    let simOperators: [String]
     var coordinate: Coordinate
-    var isCoordinateFake: Bool
+    let ipAddress: String
+    let fcmToken: String
+    var biometricInfo: BiometricInfo
     
     enum CodingKeys: String, CodingKey {
         case platform
-        case bundleIdentifier = "application"
         case isJailbroken = "is_rooted"
+        case isEmulator = "is_emulator"
+        case isCoordinateFake = "is_gps_spoof"
+        case signatures = "signature"
         case isVpn = "is_vpn"
         case isAppCloned = "is_clone_app"
         case isScreenSharing = "is_screen_sharing"
-        case isEmulator = "is_emulator"
         case isDebug = "is_debug"
+        case bundleIdentifier = "application"
         case deviceInfo = "device_id"
         case simNumbers = "sim_serial"
-        case signatures = "signature"
-        case ipAddress = "client_ip"
+        case simOperators = "sim_operator"
         case coordinate = "geolocation"
-        case isCoordinateFake = "is_gps_spoof"
+        case ipAddress = "client_ip"
+        case fcmToken = "fcm_token"
+        case biometricInfo = "biometric"
     }
     
     func toReadableString() -> String {
         return """
-        platform: \(platform)
-        bundleIdentifier: \(bundleIdentifier)
-        isJailbreak: \(isJailbroken)
+        platform
+        isJailbroken: \(isJailbroken)
+        isEmulator: \(isEmulator)
+        isCoordinateFake: \(isCoordinateFake)
+        signatures: \(signatures)
         isVpn: \(isVpn)
         isAppCloned: \(isAppCloned)
         isScreenSharing: \(isScreenSharing)
-        isEmulator: \(isEmulator)
         isDebug: \(isDebug)
-        deviceInfo: \(deviceInfo.asReadableString())
+        bundleIdentifier: \(bundleIdentifier)
+        deviceInfo: \(deviceInfo)
         simNumbers: \(simNumbers)
-        signatures: \(signatures)
+        simOperators: \(simOperators)
         coordinate: \(coordinate)
-        isCoordinateFake: \(isCoordinateFake)
         ipAddress: \(ipAddress)
+        fcmToken: \(fcmToken)
+        biometricInfo: \(biometricInfo)
         """
     }
     
@@ -74,13 +83,15 @@ internal struct MetaData: Codable {
         
         return MetaData(
             platform: mapper[CodingKeys.platform.stringValue] as! String,
-            bundleIdentifier: mapper[CodingKeys.bundleIdentifier.stringValue] as! String,
             isJailbroken: mapper[CodingKeys.isJailbroken.stringValue] as! Bool,
+            isEmulator: mapper[CodingKeys.isEmulator.stringValue] as! Bool,
+            isCoordinateFake: mapper[CodingKeys.isCoordinateFake.stringValue] as! Bool,
+            signatures: [],
             isVpn: mapper[CodingKeys.isVpn.stringValue] as! Bool,
             isAppCloned: mapper[CodingKeys.isAppCloned.stringValue] as! Bool,
             isScreenSharing: mapper[CodingKeys.isScreenSharing.stringValue] as! Bool,
-            isEmulator: mapper[CodingKeys.isEmulator.stringValue] as! Bool,
             isDebug: mapper[CodingKeys.isDebug.stringValue] as! Bool,
+            bundleIdentifier: mapper[CodingKeys.bundleIdentifier.stringValue] as! String,
             deviceInfo: DeviceInfo(
                 os: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.os.stringValue] as! String,
                 brand: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.brand.stringValue] as! String,
@@ -88,13 +99,17 @@ internal struct MetaData: Codable {
                 cpu: mapper[CodingKeys.deviceInfo.stringValue]![DeviceInfo.CodingKeys.cpu.stringValue] as! String
             ),
             simNumbers: [],
-            signatures: [],
-            ipAddress: mapper[CodingKeys.ipAddress.stringValue] as! String,
+            simOperators: [],
             coordinate: Coordinate(
                 lat: mapper[CodingKeys.coordinate.stringValue]!["lat"] as! String,
                 lng: mapper[CodingKeys.coordinate.stringValue]!["lng"] as! String
             ),
-            isCoordinateFake: mapper[CodingKeys.isCoordinateFake.stringValue] as! Bool
+            ipAddress: mapper[CodingKeys.ipAddress.stringValue] as! String,
+            fcmToken: mapper[CodingKeys.fcmToken.stringValue] as! String,
+            biometricInfo: BiometricInfo(
+                level: mapper[CodingKeys.biometricInfo.stringValue]![BiometricInfo.CodingKeys.level.stringValue] as! String,
+                isChanged: mapper[CodingKeys.biometricInfo.stringValue]![BiometricInfo.CodingKeys.isChanged.stringValue] as! Bool
+            )
         )
     }
 }
