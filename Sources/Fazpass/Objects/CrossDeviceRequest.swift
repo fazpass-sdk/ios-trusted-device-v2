@@ -1,13 +1,13 @@
 
 public struct CrossDeviceRequest {
-    let merchantAppId: String
-    let expired: Int
-    let deviceReceive: String
-    let deviceRequest: String
-    let deviceIdReceive: String
-    let deviceIdRequest: String
+    public let merchantAppId: String
+    public let expired: Int
+    public let deviceReceive: String
+    public let deviceRequest: String
+    public let deviceIdReceive: String
+    public let deviceIdRequest: String
     
-    internal init(data: [AnyHashable: Any]) throws {
+    public init(data: [AnyHashable: Any]) throws {
         merchantAppId = data["merchant_app_id"] as! String
         expired = data["expired"] as! Int
         deviceReceive = data["device_receive"] as! String

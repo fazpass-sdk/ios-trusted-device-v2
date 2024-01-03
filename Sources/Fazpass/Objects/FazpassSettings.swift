@@ -1,14 +1,14 @@
 
 public struct FazpassSettings {
-    let sensitiveData: [SensitiveData]
-    let isBiometricLevelHigh: Bool
+    public let sensitiveData: [SensitiveData]
+    public let isBiometricLevelHigh: Bool
     
     private init(_ sensitiveData: [SensitiveData], _ isBiometricLevelHigh: Bool) {
         self.sensitiveData = sensitiveData
         self.isBiometricLevelHigh = isBiometricLevelHigh
     }
     
-    static internal func fromString(_ settingsString: String) -> FazpassSettings {
+    static public func fromString(_ settingsString: String) -> FazpassSettings {
         let splitter = settingsString.split(separator: ";")
         let sensitiveData = splitter[0].split(separator: ",")
             .filter { s in s != "" }
@@ -18,7 +18,7 @@ public struct FazpassSettings {
         return FazpassSettings(sensitiveData, isBiometricLevelHigh)
     }
     
-    internal func toString() -> String {
+    public func toString() -> String {
         return "\(sensitiveData.map { s in s.rawValue }.joined(separator: ","));\(isBiometricLevelHigh)"
     }
     

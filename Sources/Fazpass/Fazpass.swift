@@ -215,7 +215,7 @@ public class Fazpass: NSObject, IosTrustedDevice {
         return request
     }
     
-    func getCrossDeviceRequestFromNotification() -> CrossDeviceRequest? {
+    public func getCrossDeviceRequestFromNotification() -> CrossDeviceRequest? {
         return lastCrossDeviceRequestFromNotification
     }
     
