@@ -9,8 +9,8 @@ public struct FazpassSettings {
     }
     
     static public func fromString(_ settingsString: String) -> FazpassSettings {
-        let splitter = settingsString.split(separator: ";")
-        let sensitiveData = splitter[0].split(separator: ",")
+        let splitter = settingsString.split(separator: ";", omittingEmptySubsequences: false)
+        let sensitiveData = splitter[0].split(separator: ",", omittingEmptySubsequences: false)
             .filter { s in s != "" }
             .map { s in SensitiveData(rawValue: String(s))! }
         let isBiometricLevelHigh = Bool(String(splitter[1])) ?? false
