@@ -48,7 +48,7 @@ struct ContentView: View {
     
     private func generateMeta() {
         deleteItems()
-        Fazpass.shared.generateMeta { meta, error in
+        Fazpass.shared.generateMeta(accountIndex: 0) { meta, error in
             guard let error = error else {
                 addItem(
                     title: "Generated Meta",

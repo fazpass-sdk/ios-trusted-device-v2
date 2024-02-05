@@ -19,11 +19,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
         
         let settings = FazpassSettings.Builder()
-            .enableSelectedSensitiveData(sensitiveData: SensitiveData.location)
             .setBiometricLevelToHigh()
             .build()
         
-        Fazpass.shared.setFazpassSettingsForAccountIndex(accountIndex: -1, settings: settings)
+        Fazpass.shared.setFazpassSettingsForAccountIndex(accountIndex: 0, settings: settings)
         
         return true
     }

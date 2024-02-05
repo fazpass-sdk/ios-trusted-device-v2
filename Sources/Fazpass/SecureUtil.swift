@@ -26,7 +26,7 @@ internal class SecureUtil {
     
     private let queryKeyAttributes: [String: Any] = [
         kSecClass as String: kSecClassKey,
-        //kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+        kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
         //kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
         //kSecAttrKeySizeInBits as String: 2048,
         //kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
@@ -65,7 +65,7 @@ internal class SecureUtil {
         var error: Unmanaged<CFError>?
         let cipherData = SecKeyCreateEncryptedData(publicKey, .rsaEncryptionPKCS1, plainData as CFData, &error)
         guard error == nil && cipherData != nil else {
-            print(error!.takeRetainedValue())
+            print("encrypt error: \(error!.takeRetainedValue())")
             return nil
         }
 
@@ -98,6 +98,7 @@ internal class SecureUtil {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(queryKeyAttributes as CFDictionary, &item)
         guard status == errSecSuccess else {
+            print("Failed to get private key with status: \(status)")
             return nil
         }
         

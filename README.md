@@ -42,9 +42,18 @@ Then, you have to declare NSFaceIDUsageDescription in your Info.plist file to be
 generating meta requires user to do biometry authentication.
 
 This package main purpose is to generate meta which you can use to communicate with Fazpass rest API. But
-before calling generate meta method, you have to initialize it first by calling this method:
+before calling generate meta method, you have to initialize it first by calling this method in your app delegate `didFinishLaunchingWithOptions`:
 ```swift
-Fazpass.shared.`init`(this, "YOUR_PUBLIC_KEY_ASSET_NAME")
+func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    // Initialize fazpass
+    Fazpass.shared.`init`(
+        publicAssetName: "YOUR_PUBLIC_KEY_ASSET_NAME",
+        application: application,
+        fcmAppId: "YOUR_FCM_APP_ID"
+    )
+    
+    return true
+}
 ```
 
 ## Usage
@@ -64,7 +73,7 @@ Fazpass.shared.generateMeta { meta, fazpassError in
         // code...
     case .biometricAuthFailed:
         // code...
-    case .biometricNotAvailable:
+    case .biometricNotAvailable(let message):
         // code...
     case .biometricNotInteractive:
         // code...
@@ -73,8 +82,6 @@ Fazpass.shared.generateMeta { meta, fazpassError in
     case .publicKeyNotExist:
         // code...
     case .uninitialized:
-        // code...
-    case .unknownError(let error):
         // code...
     }
 }
@@ -109,10 +116,6 @@ Produced when public key with the name registered in init method doesn't exist a
 #### uninitialized
 
 Produced when fazpass init method hasn't been called once.
-
-#### unknownError
-
-Produced when an unknown error has been occured when trying to generate meta. Gives you an error object of what went wrong. Less likely to happen if you followed the procedure correctly.
 
 ## Data Collection
 

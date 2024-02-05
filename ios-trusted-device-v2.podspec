@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
 spec.name       = "ios-trusted-device-v2"
-spec.version    = "1.1.2"
+spec.version    = "1.1.3"
 spec.summary    = "IOS Trusted Device"
 spec.description    = <<-DESC
 IOS counterpart for fazpass trusted device.

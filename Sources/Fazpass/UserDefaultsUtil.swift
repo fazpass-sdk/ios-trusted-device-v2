@@ -5,10 +5,10 @@ internal class UserDefaultsUtil {
     
     private let defs = UserDefaults.standard
     
-    private let KEY_ACCOUNT_INDEX_LIST = "account_index_list"
+    private let KEY_ACCOUNT_INDEX_LIST = "fazpass:account_index_list"
     
-    private let KEY_ENCRYPTED_STRING = "encrypted_string"
-    private let KEY_SETTINGS = "settings"
+    private let KEY_ENCRYPTED_STRING = "fazpass:encrypted_string"
+    private let KEY_SETTINGS = "fazpass:settings"
     private func formatKey(_ key: String, _ accountIndex: Int) -> String {
         return "\(key):\(accountIndex)"
     }

@@ -220,16 +220,16 @@ public class Fazpass: NSObject, IosTrustedDevice {
     }
     
     private func openBiometric(_ accountIndex: Int, _ isBiometricLevelHigh: Bool, _ resultBlock: @escaping (_ hasChanged: Bool, FazpassError?) -> Void) {
-        var policy: LAPolicy
+        var policy: LAPolicy = .deviceOwnerAuthentication
         if isBiometricLevelHigh {
             policy = .deviceOwnerAuthenticationWithBiometrics
-        } else {
-            policy = .deviceOwnerAuthentication
         }
         
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
-        context.localizedFallbackTitle = ""
+        if (isBiometricLevelHigh) {
+            context.localizedFallbackTitle = ""
+        }
         
         // Check if the device supports biometric authentication
         var error: NSError?
@@ -259,17 +259,21 @@ public class Fazpass: NSObject, IosTrustedDevice {
                     let defs = UserDefaultsUtil()
                     let plainText = DeviceInfoUtil().deviceInfo.asReadableString()
                     let cipherText = defs.loadEncryptedString(accountIndex)
+                    print("cipherText: \(String(describing: cipherText))")
                     // if cipher text is nil, do encryption
                     if cipherText == nil {
                         let newCipherText = SecureUtil().encrypt(plainText)
                         // if encryption failed, new cipher text will return nil. then passcode has changed
                         if newCipherText == nil {
+                            print("cipherText is nil")
                             resultBlock(true, nil)
+                            return
                         }
                         // otherwise safe new cipher text to user defaults
                         else {
                             defs.saveEncryptedString(accountIndex, newCipherText!)
                             resultBlock(false, nil)
+                            return
                         }
                     }
                     // otherwise do decryption
@@ -278,10 +282,13 @@ public class Fazpass: NSObject, IosTrustedDevice {
                         // if decryption failed, decryptedString will return null. then passcode has been changed
                         // else if decryptedString isn't the same as original string, then passcode has been changed
                         if decryptedString == nil || decryptedString != plainText {
+                            print("decryptedString: \(String(describing: decryptedString))")
                             resultBlock(true, nil)
+                            return
                         }
                         else {
                             resultBlock(false, nil)
+                            return
                         }
                     }
                 } else {
