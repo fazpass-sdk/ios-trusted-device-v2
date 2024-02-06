@@ -16,23 +16,27 @@ internal class SecureUtil {
         kSecClass as String: kSecClassKey,
         kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
         kSecAttrKeySizeInBits as String: 2048,
-        //kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+        kSecAttrEffectiveKeySize as String: 2048,
+        kSecAttrApplicationLabel as String: "\(Bundle.main.bundleIdentifier ?? "")",
+        kSecAttrApplicationTag as String: "fazpass",
         kSecPrivateKeyAttrs as String: [
             kSecAttrIsPermanent as String: true,
-            kSecAttrApplicationTag as String: "\(Bundle.main.bundleIdentifier ?? "")",
             kSecAttrAccessControl as String: SecureUtil.accessControl as Any
         ]
     ]
     
-    private let queryKeyAttributes: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
-        //kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
-        //kSecAttrKeySizeInBits as String: 2048,
-        //kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-        kSecAttrApplicationTag as String: Bundle.main.bundleIdentifier ?? "",
-        kSecReturnRef as String: true
-    ]
+    private func queryKeyAttributes(isPrivate: Bool = false) -> [String: Any] {
+        return [
+            kSecClass as String: kSecClassKey,
+            kSecAttrKeyClass as String: isPrivate ? kSecAttrKeyClassPrivate : kSecAttrKeyClassPublic,
+            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+            kSecAttrKeySizeInBits as String: 2048,
+            kSecAttrEffectiveKeySize as String: 2048,
+            kSecAttrApplicationLabel as String: "\(Bundle.main.bundleIdentifier ?? "")",
+            kSecAttrApplicationTag as String: "fazpass",
+            kSecReturnRef as String: true
+        ]
+    }
     
     func generateKey() throws {
         // 1. Create Keys Access Control
@@ -41,8 +45,8 @@ internal class SecureUtil {
         }
         
         // 2. Remove Existing Key
-        if SecItemCopyMatching(queryKeyAttributes as CFDictionary, nil) == errSecSuccess {
-            let status = SecItemDelete(queryKeyAttributes as CFDictionary)
+        if SecItemCopyMatching(queryKeyAttributes(isPrivate: true) as CFDictionary, nil) == errSecSuccess {
+            let status = SecItemDelete(queryKeyAttributes(isPrivate: true) as CFDictionary)
             guard status == errSecSuccess else {
                 throw NSError(domain: "Delete existing key failed with status: \(status)", code: 100)
             }
@@ -96,9 +100,9 @@ internal class SecureUtil {
     
     private func getPrivateKey() -> SecKey? {
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(queryKeyAttributes as CFDictionary, &item)
+        let status = SecItemCopyMatching(queryKeyAttributes(isPrivate: true) as CFDictionary, &item)
         guard status == errSecSuccess else {
-            print("Failed to get private key with status: \(status)")
+            print("Failed to get private key with status: \(status.description)")
             return nil
         }
         
@@ -106,10 +110,13 @@ internal class SecureUtil {
     }
     
     private func getPublicKey() -> SecKey? {
-        guard let privateKey = getPrivateKey() else {
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(queryKeyAttributes(isPrivate: false) as CFDictionary, &item)
+        guard status == errSecSuccess else {
+            print("Failed to get public key with status: \(status.description)")
             return nil
         }
         
-        return SecKeyCopyPublicKey(privateKey)
+        return (item as! SecKey)
     }
 }
