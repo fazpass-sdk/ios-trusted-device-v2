@@ -17,9 +17,8 @@ internal class SecureUtil {
         kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
         kSecAttrKeySizeInBits as String: 2048,
         kSecAttrEffectiveKeySize as String: 2048,
-        kSecAttrApplicationLabel as String: "\(Bundle.main.bundleIdentifier ?? "")",
-        kSecAttrApplicationTag as String: "fazpass",
         kSecPrivateKeyAttrs as String: [
+            kSecAttrApplicationTag as String: "fazpass.\(Bundle.main.bundleIdentifier ?? "")".data(using: .utf8)!,
             kSecAttrIsPermanent as String: true,
             kSecAttrAccessControl as String: SecureUtil.accessControl as Any
         ]
@@ -31,8 +30,7 @@ internal class SecureUtil {
         kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
         kSecAttrKeySizeInBits as String: 2048,
         kSecAttrEffectiveKeySize as String: 2048,
-        kSecAttrApplicationLabel as String: "\(Bundle.main.bundleIdentifier ?? "")",
-        kSecAttrApplicationTag as String: "fazpass",
+        kSecAttrApplicationTag as String: "fazpass.\(Bundle.main.bundleIdentifier ?? "")".data(using: .utf8)!,
         kSecReturnRef as String: true
     ]
     
@@ -46,7 +44,8 @@ internal class SecureUtil {
         if SecItemCopyMatching(queryKeyAttributes as CFDictionary, nil) == errSecSuccess {
             let status = SecItemDelete(queryKeyAttributes as CFDictionary)
             guard status == errSecSuccess else {
-                throw NSError(domain: "Delete existing key failed with status: \(status)", code: 100)
+                let message = SecCopyErrorMessageString(status, nil)
+                throw NSError(domain: "Delete existing key failed with status: \(String(describing: message))", code: 100)
             }
         }
         
@@ -80,7 +79,6 @@ internal class SecureUtil {
             return nil
         }
         
-        
         guard let cipherData = Data(base64Encoded: cipherText.data(using: .utf8)!) else {
             return nil
         }
@@ -100,7 +98,8 @@ internal class SecureUtil {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(queryKeyAttributes as CFDictionary, &item)
         guard status == errSecSuccess else {
-            print("Failed to get private key with status: \(status.description)")
+            let message = SecCopyErrorMessageString(status, nil)
+            print("Failed to get private key with status: \(String(describing: message))")
             return nil
         }
         
