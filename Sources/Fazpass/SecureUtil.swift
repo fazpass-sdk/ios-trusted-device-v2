@@ -9,7 +9,7 @@ internal class SecureUtil {
     private static let accessControl = SecAccessControlCreateWithFlags(
         kCFAllocatorDefault,
         kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-        [.biometryCurrentSet, .and, .biometryAny],
+        [.biometryCurrentSet],
         nil)
     
     private let generateKeyAttributes: [String: Any] = [
@@ -56,61 +56,59 @@ internal class SecureUtil {
         }
     }
     
-    func encrypt(_ plainText: String) -> String? {
-        guard let publicKey = getPublicKey() else {
-            return nil
-        }
-        
-        let plainData = plainText.data(using: .utf8)!
+    func encrypt(_ plainText: String, callback: (_ cipherText: String?, _ status: OSStatus) -> Void) {
+        retrievePublicKey { key, status in
+            guard let publicKey = key else {
+                callback(nil, status)
+                return
+            }
+            
+            let plainData = plainText.data(using: .utf8)!
 
-        var error: Unmanaged<CFError>?
-        let cipherData = SecKeyCreateEncryptedData(publicKey, .rsaEncryptionPKCS1, plainData as CFData, &error)
-        guard error == nil && cipherData != nil else {
-            print("encrypt error: \(error!.takeRetainedValue())")
-            return nil
-        }
+            var error: Unmanaged<CFError>?
+            guard let cipherData = SecKeyCreateEncryptedData(publicKey, .rsaEncryptionPKCS1, plainData as CFData, &error) else {
+                print("encrypt error: \(error!.takeRetainedValue())")
+                callback(nil, errSecInvalidEncoding)
+                return
+            }
 
-        // encode to base64 string then return
-        return (cipherData! as Data).base64EncodedString()
+            // encode to base64 string then return
+            callback((cipherData as Data).base64EncodedString(), status)
+        }
     }
     
-    func decrypt(_ cipherText: String) -> String? {
-        guard let privateKey = getPrivateKey() else {
-            return nil
+    func decrypt(_ cipherText: String, callback: (_ plainText: String?, _ status: OSStatus) -> Void) {
+        retrievePrivateKey { key, status in
+            guard let privateKey = key else {
+                callback(nil, status)
+                return
+            }
+            
+            guard let cipherData = Data(base64Encoded: cipherText.data(using: .utf8)!) else {
+                callback(nil, errSecParam)
+                return
+            }
+            
+            var error: Unmanaged<CFError>?
+            guard let plainData = SecKeyCreateDecryptedData(privateKey, .rsaEncryptionPKCS1, cipherData as CFData, &error) else {
+                print("decrypt error: \(error!.takeRetainedValue())")
+                callback(nil, errSecDecode)
+                return
+            }
+            
+            callback(String(data: plainData as Data, encoding: .utf8), status)
         }
-        
-        guard let cipherData = Data(base64Encoded: cipherText.data(using: .utf8)!) else {
-            return nil
-        }
-
-        var error: Unmanaged<CFError>?
-        let plainData = SecKeyCreateDecryptedData(privateKey, .rsaEncryptionPKCS1, cipherData as CFData, &error)
-        guard error == nil && plainData != nil else {
-            print("decrypt error: \(error!.takeRetainedValue())")
-            return nil
-        }
-
-        // decode to original string then return
-        return String(data: plainData! as Data, encoding: .utf8)
     }
     
-    private func getPrivateKey() -> SecKey? {
+    private func retrievePrivateKey(callback: (_ key: SecKey?, _ status: OSStatus) -> Void) {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(queryKeyAttributes as CFDictionary, &item)
-        guard status == errSecSuccess else {
-            let message = SecCopyErrorMessageString(status, nil)
-            print("Failed to get private key with status: \(String(describing: message))")
-            return nil
-        }
-        
-        return (item as! SecKey)
+        callback((item != nil) ? (item as! SecKey) : nil, status)
     }
     
-    private func getPublicKey() -> SecKey? {
-        guard let privateKey = getPrivateKey() else {
-            return nil
+    private func retrievePublicKey(callback: (_ key: SecKey?, _ status: OSStatus) -> Void) {
+        retrievePrivateKey { privateKey, status in
+            callback((privateKey != nil) ? SecKeyCopyPublicKey(privateKey!) : nil, status)
         }
-        
-        return SecKeyCopyPublicKey(privateKey)
     }
 }

@@ -13,7 +13,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         )
         
         do {
-            try Fazpass.shared.generateSecretKeyForHighLevelBiometric()
+            //try Fazpass.shared.generateSecretKeyForHighLevelBiometric()
         } catch {
             print(error)
         }
