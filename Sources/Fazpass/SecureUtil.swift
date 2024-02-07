@@ -9,7 +9,7 @@ internal class SecureUtil {
     private static let accessControl = SecAccessControlCreateWithFlags(
         kCFAllocatorDefault,
         kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-        [.biometryCurrentSet, .userPresence],
+        [.biometryCurrentSet, .and, .biometryAny],
         nil)
     
     private let generateKeyAttributes: [String: Any] = [
