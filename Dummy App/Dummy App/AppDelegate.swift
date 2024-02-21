@@ -22,7 +22,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             .setBiometricLevelToHigh()
             .build()
         
-        Fazpass.shared.setFazpassSettingsForAccountIndex(accountIndex: 0, settings: settings)
+        Fazpass.shared.setSettings(accountIndex: 0, settings: settings)
         
         return true
     }

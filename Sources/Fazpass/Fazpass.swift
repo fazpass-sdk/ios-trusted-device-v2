@@ -27,6 +27,8 @@ public class Fazpass: NSObject, IosTrustedDevice {
     
     public func `init`(publicAssetName: String, application: UIApplication, fcmAppId: String) {
         self.publicAssetName = publicAssetName
+        
+        // configure cross device notification
         notificationUtil.configure(application, fcmAppId)
         
         // load settings
@@ -46,12 +48,13 @@ public class Fazpass: NSObject, IosTrustedDevice {
     }
     
     public func generateMeta(accountIndex: Int = -1, resultBlock: @escaping (String, FazpassError?) -> Void) {
-        if !isInitialized {
+        // if `init` method hasn't been called once, throw uninitialized error
+        guard isInitialized else {
             resultBlock("", FazpassError.uninitialized)
             return
         }
         
-        // declare settings for this generated meta
+        // declare settings
         var locationEnabled = false
         var vpnEnabled = false
         var isBiometricLevelHigh = false
@@ -141,26 +144,29 @@ public class Fazpass: NSObject, IosTrustedDevice {
                     metaData.biometricInfo = BiometricInfo(level: "HIGH", isChanged: hasChanged)
                 }
                 
-                if locationEnabled {
-                    self.locationUtil.getLocation { location, isSuspectedMock in
-                        if let loc = location {
-                            metaData.coordinate = Coordinate(lat: String(loc.coordinate.latitude), lng: String(loc.coordinate.longitude))
-                            metaData.isCoordinateFake = isSuspectedMock
-                        }
-                        
-                        var encryptedMeta = ""
-                        var e: FazpassError?
-                        do {
-                            encryptedMeta = try self.encryptMetaData(metaData)
-                        } catch is FazpassError {
-                            e = error
-                        } catch {
-                            e = FazpassError.encryptionError(message: "Failed to encrypt")
-                        }
-                        
-                        resultBlock(encryptedMeta, e)
+                // if location setting is disabled, start encrypting metadata
+                guard locationEnabled == true else {
+                    var encryptedMeta = ""
+                    var e: FazpassError?
+                    do {
+                        encryptedMeta = try self.encryptMetaData(metaData)
+                    } catch is FazpassError {
+                        e = error
+                    } catch {
+                        e = FazpassError.encryptionError(message: "Failed to encrypt")
                     }
-                } else {
+                    
+                    resultBlock(encryptedMeta, e)
+                    return
+                }
+                
+                // if location setting is enabled, wait until location data is collected, then start encrypting metadata
+                self.locationUtil.getLocation { location, isSuspectedMock in
+                    if let loc = location {
+                        metaData.coordinate = Coordinate(lat: String(loc.coordinate.latitude), lng: String(loc.coordinate.longitude))
+                        metaData.isCoordinateFake = isSuspectedMock
+                    }
+                    
                     var encryptedMeta = ""
                     var e: FazpassError?
                     do {
@@ -177,7 +183,8 @@ public class Fazpass: NSObject, IosTrustedDevice {
         }
     }
     
-    public func generateSecretKeyForHighLevelBiometric() throws {
+    public func generateNewSecretKey() throws {
+        // delete every saved cipher text
         let defs = UserDefaultsUtil()
         let accountIndexArr = defs.getAccountIndexArray()
         for i in accountIndexArr {
@@ -188,7 +195,7 @@ public class Fazpass: NSObject, IosTrustedDevice {
         try SecureUtil().generateKey()
     }
     
-    public func setFazpassSettingsForAccountIndex(accountIndex: Int, settings: FazpassSettings?) {
+    public func setSettings(accountIndex: Int, settings: FazpassSettings?) {
         if settings != nil {
             self.settings[accountIndex] = settings
         } else {
@@ -198,7 +205,7 @@ public class Fazpass: NSObject, IosTrustedDevice {
         UserDefaultsUtil().saveFazpassSettings(accountIndex, settings)
     }
     
-    public func getFazpassSettingsForAccountIndex(accountIndex: Int) -> FazpassSettings? {
+    public func getSettings(accountIndex: Int) -> FazpassSettings? {
         return self.settings[accountIndex]
     }
     
@@ -206,7 +213,11 @@ public class Fazpass: NSObject, IosTrustedDevice {
         return crossDeviceRequestStream
     }
     
-    public func getCrossDeviceRequestFromNotification(userInfo: [AnyHashable: Any]) -> CrossDeviceRequest? {
+    public func getCrossDeviceRequestFromNotification(userInfo: [AnyHashable: Any]?) -> CrossDeviceRequest? {
+        guard let userInfo = userInfo else {
+            return lastCrossDeviceRequestFromNotification
+        }
+        
         var request: CrossDeviceRequest? = nil
         do {
             request = try CrossDeviceRequest(data: userInfo)
@@ -215,101 +226,112 @@ public class Fazpass: NSObject, IosTrustedDevice {
         return request
     }
     
-    public func getCrossDeviceRequestFromNotification() -> CrossDeviceRequest? {
-        return lastCrossDeviceRequestFromNotification
+    private func openBiometric(_ accountIndex: Int, _ isBiometricLevelHigh: Bool, _ resultBlock: @escaping (_ hasChanged: Bool, FazpassError?) -> Void) {
+        // if biometric level is high, retrieve private key from keychain and do encryption / decryption test.
+        // retrieving private key from keychain will automatically call biometric authentication.
+        if isBiometricLevelHigh {
+            openBiometricLevelHigh(accountIndex, resultBlock)
+        }
+        // if biometric level is low, we have to call local authentication manually.
+        else {
+            openBiometricLevelLow(accountIndex, resultBlock)
+        }
     }
     
-    private func openBiometric(_ accountIndex: Int, _ isBiometricLevelHigh: Bool, _ resultBlock: @escaping (_ hasChanged: Bool, FazpassError?) -> Void) {
-        // if biometric level is low, open custom biometric
-        if !isBiometricLevelHigh {
-            let policy: LAPolicy = .deviceOwnerAuthentication
-            let context = LAContext()
-            context.localizedCancelTitle = "Cancel"
-            
-            // Check if the device supports biometric authentication
-            var error: NSError?
-            guard context.canEvaluatePolicy(policy, error: &error) else {
-                switch LAError.Code(rawValue: error!.code)! {
-                case .passcodeNotSet, .biometryNotEnrolled:
-                    resultBlock(false, FazpassError.biometricNoneEnrolled)
-                case .notInteractive:
-                    resultBlock(false, FazpassError.biometricNotInteractive)
-                default:
-                    resultBlock(false, FazpassError.biometricNotAvailable(message: error!.localizedDescription))
-                }
-                return
+    private func openBiometricLevelLow(_ accountIndex: Int, _ resultBlock: @escaping (_ hasChanged: Bool, FazpassError?) -> Void) {
+        let policy: LAPolicy = .deviceOwnerAuthentication
+        let context = LAContext()
+        context.localizedCancelTitle = "Cancel"
+        
+        // Check if the device supports biometric authentication
+        var error: NSError?
+        guard context.canEvaluatePolicy(policy, error: &error) else {
+            switch LAError.Code(rawValue: error!.code)! {
+            case .passcodeNotSet, .biometryNotEnrolled:
+                resultBlock(false, FazpassError.biometricNoneEnrolled)
+            case .notInteractive:
+                resultBlock(false, FazpassError.biometricNotInteractive)
+            default:
+                resultBlock(false, FazpassError.biometricNotAvailable(message: error!.localizedDescription))
             }
-            
-            let reason = "Biometric Required"
-            context.evaluatePolicy(policy, localizedReason: reason) { success, authenticationError in
-                DispatchQueue.main.async {
-                    if success {
-                        resultBlock(false, nil)
-                        return
-                    }
-                    
-                    // if local authentication failed
-                    guard let authError = authenticationError else {
-                        return
-                    }
-                    
-                    switch authError {
-                    case LAError.userCancel, LAError.appCancel, LAError.systemCancel, LAError.biometryLockout:
-                        resultBlock(false, FazpassError.biometricAuthFailed)
-                    case LAError.userFallback, LAError.authenticationFailed:
-                        return
-                    default:
-                        resultBlock(false, FazpassError.biometricNotAvailable(message: authError.localizedDescription))
-                    }
+            return
+        }
+        
+        // open biometric prompt
+        let reason = "Biometry Required"
+        context.evaluatePolicy(policy, localizedReason: reason) { success, authenticationError in
+            DispatchQueue.main.async {
+                if success {
+                    resultBlock(false, nil)
+                    return
+                }
+                
+                // if local authentication failed
+                guard let authError = authenticationError else {
+                    return
+                }
+                
+                switch authError {
+                case LAError.userCancel, LAError.appCancel, LAError.systemCancel, LAError.biometryLockout:
+                    resultBlock(false, FazpassError.biometricAuthFailed)
+                case LAError.userFallback, LAError.authenticationFailed:
+                    return
+                default:
+                    resultBlock(false, FazpassError.biometricNotAvailable(message: authError.localizedDescription))
                 }
             }
         }
-        // if biometric level is high, retrieve private key from keychain and do encryption / decryption test
-        else {
-            let defs = UserDefaultsUtil()
-            let plainText = DeviceInfoUtil().deviceInfo.asReadableString()
-            let cipherText = defs.loadEncryptedString(accountIndex)
-            // if cipher text is nil, do encryption
-            if cipherText == nil {
-                SecureUtil().encrypt(plainText) { encryptedString, status in
-                    switch (status) {
-                    // when encryption success
-                    case errSecSuccess:
-                        // safe new cipher text to user defaults
-                        defs.saveEncryptedString(accountIndex, encryptedString!)
-                        resultBlock(false, nil)
-                        break
-                    // when local authentication failed, biometric may not have been changed yet
-                    case errSecAuthFailed:
-                        resultBlock(false, FazpassError.biometricAuthFailed)
-                        break
-                    // when encryption failed, then biometric has been changed
-                    default:
-                        resultBlock(true, nil)
-                        break
-                    }
+    }
+    
+    private func openBiometricLevelHigh(_ accountIndex: Int, _ resultBlock: @escaping (_ hasChanged: Bool, FazpassError?) -> Void) {
+        let defs = UserDefaultsUtil()
+        
+        // use device information as original text
+        let plainText = DeviceInfoUtil().deviceInfo.asReadableString()
+        
+        // load previously saved cipher text if there is any
+        let cipherText = defs.loadEncryptedString(accountIndex)
+        
+        // if there is no saved cipher text, do encryption
+        guard let cipherText = cipherText else {
+            SecureUtil().encrypt(plainText) { encryptedString, status in
+                switch (status) {
+                // when encryption success
+                case errSecSuccess:
+                    // safe new cipher text to user defaults
+                    defs.saveEncryptedString(accountIndex, encryptedString!)
+                    resultBlock(false, nil)
+                    break
+                // when local authentication failed, biometric may not have been changed yet
+                case errSecAuthFailed:
+                    resultBlock(false, FazpassError.biometricAuthFailed)
+                    break
+                // when encryption failed, then biometric has been changed
+                default:
+                    resultBlock(true, nil)
+                    break
                 }
             }
-            // otherwise do decryption
-            else {
-                SecureUtil().decrypt(cipherText!) { decryptedString, status in
-                    switch (status) {
-                    // when decryption success
-                    case errSecSuccess:
-                        let isStringDifferent = decryptedString != plainText
-                        // if string is different, biometric has been changed
-                        resultBlock(isStringDifferent, nil)
-                        break
-                    // when local authentication failed, biometric may not have been changed yet
-                    case errSecAuthFailed:
-                        resultBlock(false, FazpassError.biometricAuthFailed)
-                        break
-                    // when decryption failed, then biometric has been changed
-                    default:
-                        resultBlock(true, nil)
-                        break
-                    }
-                }
+            return
+        }
+        
+        // otherwise do decryption
+        SecureUtil().decrypt(cipherText) { decryptedString, status in
+            switch (status) {
+            // when decryption success
+            case errSecSuccess:
+                let isStringDifferent = decryptedString != plainText
+                // if string is different, biometric has been changed
+                resultBlock(isStringDifferent, nil)
+                break
+            // when local authentication failed, biometric may not have been changed yet
+            case errSecAuthFailed:
+                resultBlock(false, FazpassError.biometricAuthFailed)
+                break
+            // when decryption failed, then biometric has been changed
+            default:
+                resultBlock(true, nil)
+                break
             }
         }
     }
@@ -322,7 +344,6 @@ public class Fazpass: NSObject, IosTrustedDevice {
         guard let jsonMetaData = metaData.toJsonString() else {
             throw FazpassError.encryptionError(message: "Error encoding meta data to json")
         }
-        print(jsonMetaData)
         
         guard var key = String(data: publicKeyFile.data, encoding: String.Encoding.utf8) else {
             throw FazpassError.encryptionError(message: "Failed to convert public key file to string")
