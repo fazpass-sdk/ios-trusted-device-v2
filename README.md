@@ -30,7 +30,7 @@ end
 
 ## Getting Started
 
-Before using our product, make sure to contact us first to get keypair of public key and private key.
+Before using this SDK, make sure to contact us first to get a keypair of public key and private key, and an FCM App ID.
 after you have each of them, reference the public key into Assets.
 
 1. In your Xcode project, open Assets.
@@ -58,10 +58,8 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
 
 ## Usage
 
-Call `generateMeta(resultBlock: @escaping (String, FazpassError?) -> Void)` method to generate meta. This method
-collects specific information and generates meta data as Base64 string.
-You can use this meta to hit Fazpass API endpoint. **Will launch biometric authentication before
-generating meta**. Meta will be empty string if error is present.
+Call `generateMeta()` method to launch local authentication (biometric / password) and generate meta
+if local authentication is success. Otherwise throws `BiometricAuthFailedError`.
 ```swift
 Fazpass.shared.generateMeta { meta, fazpassError in 
     guard let error = fazpassError else {
@@ -117,20 +115,59 @@ Produced when public key with the name registered in init method doesn't exist a
 
 Produced when fazpass init method hasn't been called once.
 
+## Set preferences for data collection
+
+This package supports application with multiple accounts, and each account can have different settings for generating meta.
+To set preferences for data collection, call `setSettings()` method.
+
+```swift
+// index of an account
+let accountIndex = 0
+
+// create preferences
+let settings: FazpassSettings = FazpassSettingsBuilder()
+  .enableSelectedSensitiveData(sensitiveData: SensitiveData.location)
+  .setBiometricLevelToHigh()
+  .build()
+
+// save preferences
+Fazpass.shared.setSettings(accountIndex, settings)
+
+// apply saved preferences by using the same account index
+Fazpass.shared.generateMeta(accountIndex: accountIndex) { meta, error in
+  print(meta)
+}
+
+// delete saved preferences
+Fazpass.shared.setSettings(accountIndex, nil)
+```
+
+`generateMeta()` accountIndex parameter has -1 as it's default value.
+
+> We strongly advised against saving preferences into default account index. If your application
+> only allows one active account, use 0 instead.
+
 ## Data Collection
 
-Data collected and stored in generated meta. Based on data sensitivity, data type is divided into two: General data and Sensitive data.
-General data is always collected while Sensitive data requires more complicated procedures to enable it.
+Data collected and stored in generated meta. Based on how data is collected, data type is divided into three: 
+General data, Sensitive data and Other.
+General data is always collected while Sensitive data requires more complicated procedures before they can be collected. 
+Other is a special case. They collect a complicated test result, and might change how `generateMeta()` method works.
 
-To enable Sensitive data collection, after calling fazpass init method, you need to call `enableSelected(sensitiveData: SensitiveData...)` method and
+To enable Sensitive data collection, you need to set preferences for them and
 specifies which sensitive data you want to collect.
 ```swift
-Fazpass.shared.enableSelected(
-    SensitiveData.location,
-    SensitiveData.vpn
-)
+let builder: FazpassSettings.Builder = FazpassSettings.Builder()
+    .enableSelectedSensitiveData(sensitiveData: SensitiveData.location, SensitiveData.vpn)
 ```
-Lastly, you have to follow the procedure to enable each of them as described in their own segment down below.
+Then, you have to follow the procedure on how to enable each of them as described in their own segment down below.
+
+For others, you also need to set preferences for them and specifies which you want to enable.
+```swift
+let builder: FazpassSettings.Builder = FazpassSettings.Builder()
+    .setBiometricLevelToHigh()
+```
+For detail, read their description in their own segment down below.
 
 ### General data collected
 
@@ -153,12 +190,53 @@ Location data is collected if the user permit it, otherwise it won't be collecte
 
 #### Your device vpn status
 
-To collect vpn status data, you have to add Network Extensions Entitlement to your project.
-To add this entitlement to an iOS app or a Mac App Store app, enable the Network Extensions capability in Xcode.
-To add this entitlement to a macOS app distributed outside of the Mac App Store, perform the following steps:
-1. In the Certificates, Identifiers and Profiles section of the developer site, enable the Network Extension capability for your Developer ID–signed app. Generate a new provisioning profile and download it.
-2. On your Mac, drag the downloaded provisioning profile to Xcode to install it.
-3. In your Xcode project, enable manual signing and select the provisioning profile downloaded earlier and its associated certificate.
-4. Update the project’s entitlements.plist to include the com.apple.developer.networking.networkextension key and the values of the entitlement.
+To collect vpn status data, enable the Network Extensions capability in your Xcode project.
 
-[Apple documentation of network extensions entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_networking_networkextension)
+### Other data collected
+
+#### High-level biometric
+
+Enabling high-level biometrics makes the local authentication in `generateMeta()` method use ONLY biometrics, 
+preventing user to use password as another option. After enabling this for the first time, immediately call `generateNewSecretKey()`
+method to create a secret key that will be stored safely in device keystore provider. From now on, calling `generateMeta()`
+with High-level biometric preferences will conduct an encryption & decryption test using the newly created secret key. 
+whenever the test is failed, it means the secret key has been invalidated because one these occurred:
+- Device has enrolled another biometric information (new fingerprints, face, or iris)
+- Device has cleared all biometric information
+- Device removed their device passcode (password, pin, pattern, etc.)
+
+When secret key has been invalidated, trying to hit Fazpass Check API will fail. The recommended action for this is
+to sign out every account that has enabled high-level biometric and make them sign in again with low-level biometric settings.
+If you want to re-enable high-level biometrics after the secret key has been invalidated, make sure to 
+call `generateNewSecretKey()` once again.
+
+## Handle incoming Cross Device Request notification
+
+When application is in background state (not running), incoming cross device request will enter your system notification tray
+and shows them as a notification. Pressing said notification will launch the application with cross device request data as an argument.
+When application is in foreground state (currently running), incoming cross device request will immediately sent into the application without showing any notification.
+
+To retrieve cross device request when app is in background state, you have to call `getCrossDeviceRequestFromNotification()` method in your app delegate `didReceiveRemoteNotication`.
+```swift
+func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : any]) async -> UIBackgroundFetchResult {
+  let request = Fazpass.shared.getCrossDeviceRequestFromNotification(userInfo: userInfo)
+
+  return UIBackgroundFetchResult.newData
+}
+```
+
+To retrieve cross device request when app is in foreground state, you have to get the stream instance by calling 
+`getCrossDeviceRequestStreamInstance()` then start listening to the stream.
+```swift
+// get the stream instance
+let requestStream = Fazpass.shared.getCrossDeviceRequestStreamInstance()
+
+// start listening to the stream
+requestStream.listen { request in
+  // called everytime there is an incoming cross device request notification
+  print(request)
+}
+
+// stop listening to the stream
+requestStream.close()
+```
