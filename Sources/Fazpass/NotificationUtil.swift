@@ -55,9 +55,6 @@ internal class NotificationUtil: NSObject, MessagingDelegate, UNUserNotification
     
     public func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         let userInfo = notification.request.content.userInfo
-
-        // Print full message.
-        print("willPresent: \(userInfo)")
         
         do {
             try crossDeviceRequestStream.send(crossDeviceRequest: CrossDeviceRequest(data: userInfo))
@@ -69,8 +66,6 @@ internal class NotificationUtil: NSObject, MessagingDelegate, UNUserNotification
 
     public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let userInfo = response.notification.request.content.userInfo
-
-        print("didReceive: \(userInfo)")
         
         do {
             try crossDeviceRequestStream.send(crossDeviceRequest: CrossDeviceRequest(data: userInfo))

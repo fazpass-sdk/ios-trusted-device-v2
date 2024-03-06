@@ -9,7 +9,7 @@ public struct CrossDeviceRequest {
     
     public init(data: [AnyHashable: Any]) throws {
         merchantAppId = data["merchant_app_id"] as! String
-        expired = data["expired"] as! Int
+        expired = Int(data["expired"] as! String) ?? 0
         deviceReceive = data["device_receive"] as! String
         deviceRequest = data["device_request"] as! String
         deviceIdReceive = data["device_id_receive"] as! String
